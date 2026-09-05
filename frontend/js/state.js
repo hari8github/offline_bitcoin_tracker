@@ -11,6 +11,8 @@ const State = (() => {
     graphNodes:      {},     // id → element data (prevent reload on expand)
     graphEdges:      {},     // id → element data
     charts:          {},     // keyed by canvas id
+    chatOpen:        false,
+    lastScanTime:    null,   // Date | null — set when Alerts.rescan() completes
   };
 
   return {
@@ -26,6 +28,12 @@ const State = (() => {
 
     getSelected()  { return _s.selectedNode; },
     setSelected(n) { _s.selectedNode = n; },
+
+    isChatOpen()   { return _s.chatOpen; },
+    setChatOpen(v) { _s.chatOpen = v; },
+
+    getLastScanTime()   { return _s.lastScanTime; },
+    setLastScanTime(d)  { _s.lastScanTime = d; },
 
     addGraphNode(id, data) { _s.graphNodes[id] = data; },
     addGraphEdge(id, data) { _s.graphEdges[id] = data; },

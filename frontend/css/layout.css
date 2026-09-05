@@ -1,7 +1,6 @@
-/* ── Layout ─────────────────────────────────────────────────────
-   Rail (left, fixed 64px) · Topbar (fixed 48px) · Content area.
-   No nested scroll — each section owns the full viewport below
-   the topbar.
+/* ── Layout (v2) ────────────────────────────────────────────────
+   Rail (left, fixed 56px) · Topbar (fixed 44px) · Content area ·
+   Chat drawer (right, slide-over, 320px).
 ──────────────────────────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,7 +34,7 @@ html, body {
   height: var(--topbar-h);
   display: grid;
   place-items: center;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--accent-blue);
   background: var(--navy-800);
@@ -58,15 +57,13 @@ html, body {
 .rail-btn {
   position: relative;
   width: 100%;
-  height: 52px;
+  height: 48px;
   background: none;
   border: none;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
   color: var(--text-on-navy-muted);
   transition: color var(--transition), background var(--transition);
   border-left: 3px solid transparent;
@@ -78,24 +75,37 @@ html, body {
 .rail-btn.active {
   color: var(--accent-blue);
   border-left-color: var(--accent-blue);
-  background: rgba(46,107,230,.1);
+  background: rgba(59,125,255,.12);
 }
 .rail-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.rail-btn-label {
-  font-size: 9px;
+/* Tooltip on hover — icon-only rail, no visible labels */
+.rail-btn::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--navy-950);
+  color: var(--text-on-navy);
+  font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  line-height: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+  z-index: 300;
 }
+.rail-btn:hover::after { opacity: 1; }
 
 .rail-spacer { flex: 1; }
 
@@ -110,10 +120,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 14px;
   z-index: 150;
   border-bottom: 1px solid rgba(255,255,255,.06);
   gap: 12px;
+  transition: right var(--transition-slow);
 }
 
 .topbar-left {
@@ -128,7 +139,7 @@ html, body {
   letter-spacing: -.1px;
 }
 .topbar-divider {
-  width: 1px; height: 18px;
+  width: 1px; height: 16px;
   background: rgba(255,255,255,.12);
 }
 .topbar-case-label {
@@ -148,7 +159,7 @@ html, body {
   cursor: pointer;
   outline: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B7E9A' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237C8AA0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 6px center;
 }
@@ -168,21 +179,35 @@ html, body {
   font-size: 11px;
   font-weight: 600;
   color: var(--risk-high);
-  background: rgba(192,57,43,.15);
-  border: 1px solid rgba(192,57,43,.35);
-  border-radius: 20px;
+  background: rgba(229,72,77,.15);
+  border: 1px solid rgba(229,72,77,.35);
+  border-radius: var(--radius-pill);
   padding: 2px 8px;
   cursor: pointer;
   transition: background var(--transition);
 }
-.topbar-alert-badge:hover { background: rgba(192,57,43,.25); }
+.topbar-alert-badge:hover { background: rgba(229,72,77,.25); }
 .topbar-alert-badge.hidden { display: none; }
+
+.topbar-chat-toggle {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--navy-700);
+  color: var(--accent-blue);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  transition: background var(--transition);
+}
+.topbar-chat-toggle:hover { background: rgba(59,125,255,.2); }
+.topbar-chat-toggle.active { background: var(--accent-blue); color: #fff; }
 
 .health-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--risk-high);
-  title: "Neo4j status";
   transition: background .4s;
   flex-shrink: 0;
 }
@@ -201,8 +226,10 @@ html, body {
   top: var(--topbar-h);
   right: 0;
   bottom: 0;
-  overflow: hidden;   /* Each section manages its own scroll/overflow */
+  overflow: hidden;
+  transition: right var(--transition-slow);
 }
+.content.chat-open { right: var(--chat-w); }
 
 /* ── Section visibility ─────────────────────────────────────── */
 .section {
@@ -215,10 +242,35 @@ html, body {
 /* ── Dashboard section ──────────────────────────────────────── */
 #section-dashboard {
   overflow-y: auto;
+  flex-direction: column;
+  background: var(--surface-alt);
+}
+
+.dash-hero {
+  background: var(--navy-950);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.dash-hero-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-on-navy);
+  letter-spacing: -.2px;
+}
+.dash-hero-sub {
+  font-size: 11px;
+  color: var(--text-on-navy-muted);
+  margin-top: 2px;
+}
+
+.dash-body {
   padding: 20px 24px;
+  display: flex;
   flex-direction: column;
   gap: 20px;
-  background: var(--surface-alt);
 }
 
 .kpi-strip {
@@ -241,29 +293,13 @@ html, body {
   overflow: hidden;
 }
 
-.filter-col {
-  width: 232px;
-  min-width: 232px;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  flex-shrink: 0;
-  transition: width var(--transition), min-width var(--transition);
-}
-.filter-col.collapsed {
-  width: 0;
-  min-width: 0;
-  overflow: hidden;
-}
-
 .graph-col {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  transition: margin-right var(--transition-slow);
 }
 
 .graph-toolbar {
@@ -280,11 +316,12 @@ html, body {
   flex: 1;
   width: 100%;
   background: var(--surface-alt);
+  position: relative;
 }
 
 .graph-cap-banner {
   position: absolute;
-  top: 42px; left: 0; right: 0;
+  top: 0; left: 0; right: 0;
   background: var(--risk-med-bg);
   border-bottom: 1px solid var(--risk-med);
   color: var(--risk-med);
@@ -304,11 +341,12 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0;
-  transition: width var(--transition);
+  transition: width var(--transition-slow);
+  box-shadow: var(--shadow-panel);
 }
 .evidence-panel.open {
-  width: 300px;
-  min-width: 300px;
+  width: var(--evidence-w);
+  min-width: var(--evidence-w);
   overflow-y: auto;
 }
 
@@ -317,43 +355,89 @@ html, body {
   overflow-y: auto;
   padding: 20px 24px;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   background: var(--surface-alt);
 }
 
-/* ── Assistant section ──────────────────────────────────────── */
-#section-assistant {
-  flex-direction: column;
+/* ── Chat drawer (persistent, all sections) ─────────────────── */
+.chat-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: var(--chat-w);
   background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-chat);
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--transition-slow);
 }
+.chat-drawer.open { transform: translateX(0); }
+
+.chat-drawer-header {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  background: var(--navy-950);
+  color: var(--text-on-navy);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.chat-drawer-header button {
+  background: none;
+  border: none;
+  color: var(--text-on-navy-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+}
+.chat-drawer-header button:hover { color: var(--text-on-navy); }
 
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .chat-input-row {
   display: flex;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-top: 1px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
 }
 
-/* ── Ingest section (modal-like panel in assistant) ─────────── */
-.ingest-drawer {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  background: var(--surface);
-  border-top: 2px solid var(--accent-blue);
-  padding: 16px;
-  transform: translateY(100%);
-  transition: transform var(--transition);
-  z-index: 50;
+/* Floating toggle button (visible when drawer is closed) */
+.chat-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-chat);
+  z-index: 399;
+  transition: transform var(--transition), opacity var(--transition);
+  animation: fab-pulse 2.6s infinite;
 }
-.ingest-drawer.open { transform: translateY(0); }
+.chat-fab:hover { transform: scale(1.06); }
+.chat-fab.hidden { opacity: 0; pointer-events: none; transform: scale(.8); }
+
+@keyframes fab-pulse {
+  0%, 100% { box-shadow: var(--shadow-chat), 0 0 0 0 rgba(59,125,255,.35); }
+  50%      { box-shadow: var(--shadow-chat), 0 0 0 8px rgba(59,125,255,0); }
+}

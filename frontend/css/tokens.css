@@ -1,54 +1,68 @@
-/* ── Design Tokens ──────────────────────────────────────────────
+/* ── Design Tokens (v2) ─────────────────────────────────────────
    Every value in layout.css and components.css references only
    these variables — never a raw hex or px value unless trivial.
 ──────────────────────────────────────────────────────────────── */
 :root {
   /* Structure */
-  --navy-950:    #0B1220;
-  --navy-800:    #152238;
-  --navy-700:    #1D2E4A;
+  --navy-950:    #0A0F1C;
+  --navy-800:    #101827;
+  --navy-700:    #1A2438;
 
   /* Content surfaces */
-  --surface:     #FFFFFF;
-  --surface-alt: #F4F6FA;
+  --surface:       #FFFFFF;
+  --surface-alt:   #F7F8FB;
   --surface-hover: #EEF1F8;
 
   /* Borders */
-  --border:      #DCE2ED;
-  --border-strong: #B8C4D8;
+  --border:        #E2E5EE;
+  --border-strong: #C7CEDD;
 
   /* Text */
-  --text-primary: #101828;
-  --text-muted:   #5B6472;
-  --text-on-navy: #C8D4E8;
-  --text-on-navy-muted: #6B7E9A;
+  --text-primary:       #101828;
+  --text-muted:         #6C7688;
+  --text-on-navy:       #E0E6F0;
+  --text-on-navy-muted: #7C8AA0;
 
   /* Actions */
-  --accent-blue:  #2E6BE6;
-  --accent-hover: #2459C8;
-  --accent-dim:   #EBF1FD;
+  --accent-blue:  #3B7DFF;
+  --accent-hover: #2F68D9;
+  --accent-dim:   #EAF1FF;
 
   /* Risk */
-  --risk-high:    #C0392B;
-  --risk-high-bg: #FDECEA;
-  --risk-med:     #B8860B;
-  --risk-med-bg:  #FDF6E3;
-  --risk-low:     #2E8B57;
-  --risk-low-bg:  #E8F5EE;
+  --risk-high:    #E5484D;
+  --risk-high-bg: #FDEBEC;
+  --risk-med:     #F5A623;
+  --risk-med-bg:  #FEF3E0;
+  --risk-low:     #30A46C;
+  --risk-low-bg:  #E7F6EE;
+
+  /* Detector type accents */
+  --type-coinjoin: #3B7DFF;
+  --type-peeling:  #F5A623;
 
   /* Structural dimensions */
-  --rail-w:    64px;
-  --topbar-h:  48px;
+  --rail-w:      56px;
+  --topbar-h:    44px;
+  --chat-w:      320px;
+  --evidence-w:  320px;
 
   /* Fonts */
-  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Courier New', ui-monospace, monospace;
+  --font-ui:   'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
 
-  /* Misc */
-  --radius-sm: 4px;
-  --radius:    6px;
-  --radius-lg: 10px;
-  --shadow-sm: 0 1px 4px rgba(0,0,0,.08);
-  --shadow:    0 2px 12px rgba(0,0,0,.12);
-  --transition: 160ms ease;
+  /* Radii */
+  --radius-sm:   6px;   /* inputs */
+  --radius:      8px;   /* cards */
+  --radius-lg:   12px;
+  --radius-pill: 20px;
+
+  /* Elevation */
+  --shadow-card:  0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+  --shadow-panel: 0 4px 16px rgba(16,24,40,.08);
+  --shadow-chat:  0 8px 30px rgba(16,24,40,.16);
+  --glass-bg:     rgba(255,255,255,.72);
+
+  /* Motion */
+  --transition:      160ms ease;
+  --transition-slow: 300ms ease;
 }
