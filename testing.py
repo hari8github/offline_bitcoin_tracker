@@ -1,42 +1,39 @@
 from __future__ import annotations
 
-import json
-import sys
 from config import get_neo4j_driver, DEFAULT_CASE_ID
-from detectors.coinjoin import detect_coinjoin, write_alerts
+from agents.graph import build_agent, run_agent
 
+CASE_ID = DEFAULT_CASE_ID
 
-def main():
-    print("=" * 60)
-    print("COINJOIN DETECTOR TEST")
-    print(f"Target Case ID: {DEFAULT_CASE_ID}")
-    print("=" * 60)
+with get_neo4j_driver() as driver:
+    driver.verify_connectivity()
+    print(f"[+] Connected to Neo4j  |  Case: {CASE_ID}\n")
 
-    with get_neo4j_driver() as driver:
-        # 1. Check Neo4j Connectivity
-        driver.verify_connectivity()
-        print("[+] Connected to Neo4j successfully.")
+    # Pre-compile the graph once — reused across all three test calls
+    compiled = build_agent(driver)
 
-        # 2. Run CoinJoin Detector
-        alerts = detect_coinjoin(driver, case_id=DEFAULT_CASE_ID, min_confidence=0.5)
+    # ── Test 1: fast-path (keyword match, no LLM) ──────────────
+    r1 = run_agent(driver, case_id=CASE_ID,
+                   user_input="show peeling chains",
+                   compiled_graph=compiled)
+    print("=== Test 1: show peeling chains ===")
+    print("reply:", r1.reply)
+    print("tool: ", r1.tool)
+    print()
 
-        print(f"\n[i] Detected {len(alerts)} CoinJoin-like Transaction(s):")
-        for i, a in enumerate(alerts, 1):
-            print(f"\n[{i}] Alert ID: {a['alert_id']}")
-            print(f"    TXID:       {a['txid']}")
-            print(f"    Type:       {a['type']}")
-            print(f"    Confidence: {a['confidence'] * 100:.1f}%")
-            print(f"    Evidence:   {json.dumps(a['evidence'], indent=8)}")
+    # ── Test 2: fast-path (why + txid → explain_alert) ─────────
+    r2 = run_agent(driver, case_id=CASE_ID,
+                   user_input="why is tx_csv_0040 suspicious",
+                   compiled_graph=compiled)
+    print("=== Test 2: explain tx_csv_0040 ===")
+    print("reply:", r2.reply)
+    print("tool: ", r2.tool)
+    print()
 
-        # 3. Write alerts to Neo4j
-        if alerts:
-            write_alerts(driver, alerts, case_id=DEFAULT_CASE_ID)
-            print(f"\n[+] Successfully wrote {len(alerts)} :Alert node(s) linked via [:FLAGS] in Neo4j.")
-        else:
-            print("\n[-] No CoinJoin transactions detected above threshold for this case.")
-
-        print("=" * 60)
-
-
-if __name__ == "__main__":
-    main()
+    # ── Test 3: LLM fallback (no keyword match) ─────────────────
+    r3 = run_agent(driver, case_id=CASE_ID,
+                   user_input="can you tell me if anything weird happened with that big transaction",
+                   compiled_graph=compiled)
+    print("=== Test 3: LLM fallback ===")
+    print("reply:", r3.reply)
+    print("tool: ", r3.tool)

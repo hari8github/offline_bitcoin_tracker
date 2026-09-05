@@ -1,0 +1,359 @@
+/* ── Layout ─────────────────────────────────────────────────────
+   Rail (left, fixed 64px) · Topbar (fixed 48px) · Content area.
+   No nested scroll — each section owns the full viewport below
+   the topbar.
+──────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+/* ── Rail ───────────────────────────────────────────────────── */
+.rail {
+  position: fixed;
+  left: 0; top: 0;
+  width: var(--rail-w);
+  height: 100vh;
+  background: var(--navy-950);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  z-index: 200;
+  border-right: 1px solid rgba(255,255,255,.06);
+}
+
+.rail-logo {
+  width: var(--rail-w);
+  height: var(--topbar-h);
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  background: var(--navy-800);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  flex-shrink: 0;
+  letter-spacing: -1px;
+  user-select: none;
+}
+
+.rail-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0;
+  flex: 1;
+  width: 100%;
+}
+
+.rail-btn {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-on-navy-muted);
+  transition: color var(--transition), background var(--transition);
+  border-left: 3px solid transparent;
+}
+.rail-btn:hover {
+  color: var(--text-on-navy);
+  background: var(--navy-700);
+}
+.rail-btn.active {
+  color: var(--accent-blue);
+  border-left-color: var(--accent-blue);
+  background: rgba(46,107,230,.1);
+}
+.rail-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rail-btn-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  line-height: 1;
+}
+
+.rail-spacer { flex: 1; }
+
+/* ── Topbar ─────────────────────────────────────────────────── */
+.topbar {
+  position: fixed;
+  left: var(--rail-w);
+  top: 0;
+  right: 0;
+  height: var(--topbar-h);
+  background: var(--navy-800);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 150;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  gap: 12px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-on-navy);
+  letter-spacing: -.1px;
+}
+.topbar-divider {
+  width: 1px; height: 18px;
+  background: rgba(255,255,255,.12);
+}
+.topbar-case-label {
+  font-size: 11px;
+  color: var(--text-on-navy-muted);
+  font-weight: 500;
+}
+.topbar-select {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--navy-700);
+  color: var(--text-on-navy);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--radius-sm);
+  padding: 3px 24px 3px 8px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B7E9A' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+.topbar-select:focus { border-color: var(--accent-blue); }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.topbar-alert-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--risk-high);
+  background: rgba(192,57,43,.15);
+  border: 1px solid rgba(192,57,43,.35);
+  border-radius: 20px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.topbar-alert-badge:hover { background: rgba(192,57,43,.25); }
+.topbar-alert-badge.hidden { display: none; }
+
+.health-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--risk-high);
+  title: "Neo4j status";
+  transition: background .4s;
+  flex-shrink: 0;
+}
+.health-dot.ok  { background: var(--risk-low); animation: pulse 3s infinite; }
+.health-dot.err { background: var(--risk-high); animation: none; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .4; }
+}
+
+/* ── Content area ───────────────────────────────────────────── */
+.content {
+  position: fixed;
+  left: var(--rail-w);
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  overflow: hidden;   /* Each section manages its own scroll/overflow */
+}
+
+/* ── Section visibility ─────────────────────────────────────── */
+.section {
+  display: none;
+  width: 100%;
+  height: 100%;
+}
+.section.active { display: flex; flex-direction: column; }
+
+/* ── Dashboard section ──────────────────────────────────────── */
+#section-dashboard {
+  overflow-y: auto;
+  padding: 20px 24px;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--surface-alt);
+}
+
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 860px) { .chart-grid { grid-template-columns: 1fr; } }
+
+/* ── Investigate section ────────────────────────────────────── */
+#section-investigate {
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.filter-col {
+  width: 232px;
+  min-width: 232px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+  transition: width var(--transition), min-width var(--transition);
+}
+.filter-col.collapsed {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.graph-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#cy {
+  flex: 1;
+  width: 100%;
+  background: var(--surface-alt);
+}
+
+.graph-cap-banner {
+  position: absolute;
+  top: 42px; left: 0; right: 0;
+  background: var(--risk-med-bg);
+  border-bottom: 1px solid var(--risk-med);
+  color: var(--risk-med);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  display: none;
+  z-index: 10;
+}
+.graph-cap-banner.visible { display: block; }
+
+.evidence-panel {
+  width: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width var(--transition);
+}
+.evidence-panel.open {
+  width: 300px;
+  min-width: 300px;
+  overflow-y: auto;
+}
+
+/* ── Alerts section ─────────────────────────────────────────── */
+#section-alerts {
+  overflow-y: auto;
+  padding: 20px 24px;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--surface-alt);
+}
+
+/* ── Assistant section ──────────────────────────────────────── */
+#section-assistant {
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+/* ── Ingest section (modal-like panel in assistant) ─────────── */
+.ingest-drawer {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 2px solid var(--accent-blue);
+  padding: 16px;
+  transform: translateY(100%);
+  transition: transform var(--transition);
+  z-index: 50;
+}
+.ingest-drawer.open { transform: translateY(0); }

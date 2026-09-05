@@ -1,0 +1,54 @@
+/* ── Design Tokens ──────────────────────────────────────────────
+   Every value in layout.css and components.css references only
+   these variables — never a raw hex or px value unless trivial.
+──────────────────────────────────────────────────────────────── */
+:root {
+  /* Structure */
+  --navy-950:    #0B1220;
+  --navy-800:    #152238;
+  --navy-700:    #1D2E4A;
+
+  /* Content surfaces */
+  --surface:     #FFFFFF;
+  --surface-alt: #F4F6FA;
+  --surface-hover: #EEF1F8;
+
+  /* Borders */
+  --border:      #DCE2ED;
+  --border-strong: #B8C4D8;
+
+  /* Text */
+  --text-primary: #101828;
+  --text-muted:   #5B6472;
+  --text-on-navy: #C8D4E8;
+  --text-on-navy-muted: #6B7E9A;
+
+  /* Actions */
+  --accent-blue:  #2E6BE6;
+  --accent-hover: #2459C8;
+  --accent-dim:   #EBF1FD;
+
+  /* Risk */
+  --risk-high:    #C0392B;
+  --risk-high-bg: #FDECEA;
+  --risk-med:     #B8860B;
+  --risk-med-bg:  #FDF6E3;
+  --risk-low:     #2E8B57;
+  --risk-low-bg:  #E8F5EE;
+
+  /* Structural dimensions */
+  --rail-w:    64px;
+  --topbar-h:  48px;
+
+  /* Fonts */
+  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', ui-monospace, monospace;
+
+  /* Misc */
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,.08);
+  --shadow:    0 2px 12px rgba(0,0,0,.12);
+  --transition: 160ms ease;
+}
