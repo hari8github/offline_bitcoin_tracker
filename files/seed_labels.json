@@ -1,0 +1,29 @@
+[
+  {
+    "address": "bc1qjsonSEED9999",
+    "entity_name": "Known-High-Risk-Service-1",
+    "entity_type": "illicit_service",
+    "risk_score": 1.0,
+    "label_confidence": 0.95,
+    "source": "supplied_analyst_dataset",
+    "first_flagged_txid": "tx_json_0042"
+  },
+  {
+    "address": "bc1qcsvSEED9999",
+    "entity_name": "Known-High-Risk-Service-1",
+    "entity_type": "illicit_service",
+    "risk_score": 1.0,
+    "label_confidence": 0.95,
+    "source": "supplied_analyst_dataset",
+    "first_flagged_txid": "tx_csv_0042"
+  },
+  {
+    "address": "bc1qxmlSEED9999",
+    "entity_name": "Known-High-Risk-Service-1",
+    "entity_type": "illicit_service",
+    "risk_score": 1.0,
+    "label_confidence": 0.95,
+    "source": "supplied_analyst_dataset",
+    "first_flagged_txid": "tx_xml_0042"
+  }
+]

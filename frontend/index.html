@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitcoin Forensics & Transaction Monitoring Dashboard</title>
+  <meta name="description" content="Offline Bitcoin transaction forensics, typology detection, risk scoring, and interactive graph traversal.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="top-nav">
+    <div class="nav-left">
+      <div class="logo-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="#F7931A" stroke-width="2" fill="#F7931A" fill-opacity="0.15"/>
+          <path d="M9.5 7.5H13.25C14.2165 7.5 15 8.2835 15 9.25C15 10.2165 14.2165 11 13.25 11M9.5 11H14C15.1046 11 16 11.8954 16 13C16 14.1046 15.1046 15 14 15H9.5M9.5 6V17M11.5 5V6M11.5 17V18M13.5 5V6M13.5 17V18" stroke="#F7931A" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="nav-title">Bitcoin Forensics & Traversal Engine</h1>
+        <div class="nav-subtitle">Offline Transaction Monitoring, Typology Detection & Graph Traversal</div>
+      </div>
+    </div>
+
+    <!-- Center: Dataset Switcher -->
+    <div class="dataset-switcher" id="datasetSwitcher">
+      <button class="dataset-btn active" data-dataset="json" id="btnDsJson">
+        <span class="ds-icon">{}</span> JSON Dataset <span class="ds-badge">50 TX</span>
+      </button>
+      <button class="dataset-btn" data-dataset="csv" id="btnDsCsv">
+        <span class="ds-icon">📊</span> CSV Dataset <span class="ds-badge">50 TX</span>
+      </button>
+      <button class="dataset-btn" data-dataset="xml" id="btnDsXml">
+        <span class="ds-icon">&lt;&gt;</span> XML Dataset <span class="ds-badge">50 TX</span>
+      </button>
+      <button class="dataset-btn upload-btn" id="btnUploadModal">
+        <span class="ds-icon">⬆️</span> Custom File
+      </button>
+    </div>
+
+    <!-- Right: Status and Quick Actions -->
+    <div class="nav-right">
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span class="status-text" id="statusText">Offline Engine Active</span>
+      </div>
+      <button class="btn btn-secondary" id="btnExportJson" title="Export Analyzed Data">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Report
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="dashboard-container">
+    <!-- Row 1: KPI Metrics Bar -->
+    <section class="kpi-grid" id="kpiGrid">
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Total Transactions</span>
+          <span class="kpi-badge neutral" id="kpiTxRatio">100% Loaded</span>
+        </div>
+        <div class="kpi-value" id="kpiTotalTx">50</div>
+        <div class="kpi-subtext" id="kpiBlockTime">Time Range: Aug 02 - Aug 05, 2026</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Total Monitored Volume</span>
+          <span class="kpi-badge btc">BTC</span>
+        </div>
+        <div class="kpi-value" id="kpiTotalVolume">0.00 <span class="unit">BTC</span></div>
+        <div class="kpi-subtext" id="kpiAvgTxVolume">Avg: 0.00 BTC / tx</div>
+      </div>
+
+      <div class="kpi-card warning-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Illicit & Tainted Flow</span>
+          <span class="kpi-badge danger" id="kpiTaintBadge">High Risk</span>
+        </div>
+        <div class="kpi-value danger-text" id="kpiTaintVolume">0.00 <span class="unit">BTC</span></div>
+        <div class="kpi-subtext" id="kpiTaintedTxsCount">0 Tainted Transactions Flagged</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Monitored Addresses</span>
+          <span class="kpi-badge info">Entities</span>
+        </div>
+        <div class="kpi-value" id="kpiTotalAddresses">0</div>
+        <div class="kpi-subtext" id="kpiSeedMatchSub">1 Illicit Seed Anchor Identified</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Complex Typologies</span>
+          <span class="kpi-badge purple">Patterns</span>
+        </div>
+        <div class="kpi-value" id="kpiPatternsCount">0</div>
+        <div class="kpi-subtext" id="kpiPatternSummary">Peel Chains, Mixers & Fan-out</div>
+      </div>
+    </section>
+
+    <!-- Row 2: Interactive Traversal Graph & Inspector Panel -->
+    <section class="graph-workspace-section">
+      <!-- Graph Main Viewport Area -->
+      <div class="graph-main-card">
+        <!-- Graph Control Header -->
+        <div class="graph-toolbar">
+          <div class="toolbar-left">
+            <span class="toolbar-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/><path d="M6 9v6"/></svg>
+              Transaction Traversal Graph
+            </span>
+            <div class="badge-tag" id="graphElementsCount">146 Nodes • 150 Edges</div>
+          </div>
+
+          <!-- Controls: View Mode & Layout -->
+          <div class="toolbar-center">
+            <div class="toggle-group" title="Switch graph display model">
+              <button class="toggle-btn active" id="btnViewBipartite" data-mode="bipartite">
+                TX & Address (Full)
+              </button>
+              <button class="toggle-btn" id="btnViewDirect" data-mode="direct">
+                Address-to-Address
+              </button>
+            </div>
+
+            <div class="toggle-group" title="Graph Layout Arrangement">
+              <button class="toggle-btn active" id="btnLayoutForce" data-layout="force">
+                Physics Layout
+              </button>
+              <button class="toggle-btn" id="btnLayoutHierarchical" data-layout="hierarchical">
+                Timeline Flow
+              </button>
+            </div>
+          </div>
+
+          <!-- Toolbar Right: Filters & Action buttons -->
+          <div class="toolbar-right">
+            <div class="search-box">
+              <input type="text" id="graphSearchInput" placeholder="Search Address / TXID..." autocomplete="off">
+              <button class="search-clear-btn" id="btnGraphSearchClear" title="Clear Search">&times;</button>
+            </div>
+
+            <button class="btn btn-danger-glow" id="btnTraceSeedPath" title="Trace shortest path from selected node to illicit seed">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Trace Seed Path
+            </button>
+
+            <button class="btn btn-icon" id="btnFreezePhysics" title="Toggle Physics Simulation">
+              <span id="physicsIcon">⏸️</span>
+            </button>
+            <button class="btn btn-icon" id="btnZoomIn" title="Zoom In">+</button>
+            <button class="btn btn-icon" id="btnZoomOut" title="Zoom Out">-</button>
+            <button class="btn btn-icon" id="btnFitGraph" title="Fit to Screen">⛶</button>
+            <button class="btn btn-icon" id="btnResetHighlights" title="Reset Highlights & View">↺</button>
+          </div>
+        </div>
+
+        <!-- Filter Sub-bar -->
+        <div class="graph-filter-bar">
+          <div class="filter-group">
+            <span class="filter-label">Filter Typology:</span>
+            <select id="selectTypologyFilter" class="custom-select">
+              <option value="ALL">All Typologies (50 TXs)</option>
+              <option value="SEED">🔴 Illicit Seed Anchor & Direct</option>
+              <option value="PEEL">🟠 Peel Chains & Change Hops</option>
+              <option value="CJ">🟣 CoinJoin / Equal-Value Mixers</option>
+              <option value="MI">🔵 Multi-Input Consolidations</option>
+              <option value="BURST">🟡 Burst / Rapid Fan-outs</option>
+              <option value="HV">🟢 High-Value Transfers (&gt;10 BTC)</option>
+              <option value="STANDARD">⚪ Standard Transfers</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-label">Risk Level:</span>
+            <select id="selectRiskFilter" class="custom-select">
+              <option value="ALL">All Risk Scores</option>
+              <option value="HIGH">High Risk (0.75 - 1.0)</option>
+              <option value="MEDIUM">Medium Risk (0.35 - 0.74)</option>
+              <option value="LOW">Low Risk (0.00 - 0.34)</option>
+            </select>
+          </div>
+
+          <div class="graph-legend-inline">
+            <span class="legend-item"><span class="legend-dot red"></span> Illicit Seed</span>
+            <span class="legend-item"><span class="legend-dot orange"></span> Peel Chain</span>
+            <span class="legend-item"><span class="legend-dot purple"></span> CoinJoin</span>
+            <span class="legend-item"><span class="legend-dot blue"></span> Consolidation</span>
+            <span class="legend-item"><span class="legend-dot yellow"></span> Burst</span>
+            <span class="legend-item"><span class="legend-dot green"></span> High-Value</span>
+            <span class="legend-item"><span class="legend-dot gray"></span> Standard</span>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="graph-viewport-wrapper" id="graphViewport">
+          <canvas id="graphCanvas"></canvas>
+          
+          <!-- Floating Overlay: Navigation Hint -->
+          <div class="canvas-overlay-hint">
+            <span>🖱️ Drag to pan • Scroll to zoom • Click node to inspect • Double-click to focus</span>
+          </div>
+
+          <!-- Active Path Traversal Banner -->
+          <div class="traversal-banner" id="traversalBanner" style="display: none;">
+            <div class="traversal-info">
+              <span class="traversal-icon">⚡</span>
+              <span id="traversalText">Tracing Path to Illicit Seed Anchor (3 Hops)</span>
+            </div>
+            <button class="btn-banner-close" id="btnCloseBanner">&times;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graph Side Inspector Panel -->
+      <aside class="graph-inspector-panel" id="inspectorPanel">
+        <div class="inspector-header">
+          <div class="inspector-title-row">
+            <span class="inspector-badge" id="inspNodeTypeBadge">Entity</span>
+            <span class="inspector-risk-pill" id="inspRiskPill">Risk: 0.00</span>
+          </div>
+          <h3 class="inspector-id" id="inspNodeId">Select an Address or TX</h3>
+        </div>
+
+        <div class="inspector-body" id="inspectorBody">
+          <!-- Default Empty State -->
+          <div class="inspector-empty" id="inspectorEmpty">
+            <div class="empty-icon">🔍</div>
+            <h4>No Node Selected</h4>
+            <p>Click on any address circle or transaction hex on the graph to inspect forensic classification, UTXO inputs/outputs, network metadata, and trace hops.</p>
+            <div class="quick-seed-select">
+              <button class="btn btn-secondary btn-sm" id="btnInspectSeedDirect">Inspect Illicit Seed Entity</button>
+            </div>
+          </div>
+
+          <!-- Active Details Content -->
+          <div class="inspector-details" id="inspectorDetails" style="display: none;">
+            <!-- Forensic Classification Card -->
+            <div class="insp-section">
+              <div class="section-title">Forensic Classification</div>
+              <div class="tag-row" id="inspTagsContainer">
+                <span class="tag-pill tag-danger">Known Illicit Service</span>
+              </div>
+              <div class="risk-meter-container">
+                <div class="risk-meter-labels">
+                  <span>Risk Score</span>
+                  <span id="inspRiskScoreVal">1.00 / 1.00</span>
+                </div>
+                <div class="risk-bar-track">
+                  <div class="risk-bar-fill" id="inspRiskBar" style="width: 100%;"></div>
+                </div>
+              </div>
+              <div class="seed-distance-row" id="inspSeedDistRow">
+                <span class="label">Proximity to Seed:</span>
+                <span class="value" id="inspSeedDistVal">0 Hops (Direct Anchor)</span>
+              </div>
+            </div>
+
+            <!-- Volume & Flow Metrics -->
+            <div class="insp-section">
+              <div class="section-title">Volume & Balance</div>
+              <div class="insp-metrics-grid">
+                <div class="insp-metric-box">
+                  <span class="metric-label">Total Inflow</span>
+                  <span class="metric-val text-success" id="inspInflow">0.00 BTC</span>
+                </div>
+                <div class="insp-metric-box">
+                  <span class="metric-label">Total Outflow</span>
+                  <span class="metric-val text-warning" id="inspOutflow">0.00 BTC</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Network & Relay Context -->
+            <div class="insp-section" id="inspNetworkSection">
+              <div class="section-title">Network & Geo Metadata</div>
+              <div class="meta-list">
+                <div class="meta-item">
+                  <span class="meta-k">Country / ASN:</span>
+                  <span class="meta-v" id="inspGeoAsn">US • ASN 64500</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-k">P2P Endpoint:</span>
+                  <span class="meta-v font-mono" id="inspIpPort">192.0.2.1:8333</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-k">Timestamp:</span>
+                  <span class="meta-v" id="inspTimestamp">2026-08-05 12:49:00 UTC</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connected UTXO List -->
+            <div class="insp-section">
+              <div class="section-title" id="inspUtxoListTitle">Connected Inputs & Outputs</div>
+              <div class="utxo-list" id="inspUtxoList">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Forensic Traversal Action Buttons -->
+            <div class="insp-actions">
+              <button class="btn btn-primary btn-block" id="btnInspTraceSeed">
+                ⚡ Trace Path to Illicit Seed
+              </button>
+              <div class="btn-group-2">
+                <button class="btn btn-secondary" id="btnInspTraceUpstream" title="Trace all upstream funding sources">
+                  🔼 Ancestors
+                </button>
+                <button class="btn btn-secondary" id="btnInspTraceDownstream" title="Trace all downstream spending hops">
+                  🔽 Descendants
+                </button>
+              </div>
+              <button class="btn btn-outline btn-block" id="btnInspOpenTxModal">
+                📄 Open Full UTXO Breakdown
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- Row 3: Insights & Analytics Grid -->
+    <section class="insights-section">
+      <div class="insight-card">
+        <div class="card-header">
+          <h3 class="card-title">Typology Distribution & Forensics</h3>
+          <span class="card-subtitle">Identified Patterns</span>
+        </div>
+        <div class="typology-bars-list" id="typologyBarsList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <div class="insight-card">
+        <div class="card-header">
+          <h3 class="card-title">Geographic & ASN Breakdown</h3>
+          <span class="card-subtitle">P2P Node Relay Origins</span>
+        </div>
+        <div class="geo-bars-list" id="geoBarsList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <div class="insight-card">
+        <div class="card-header">
+          <h3 class="card-title">Network Protocols & Port Activity</h3>
+          <span class="card-subtitle">P2P Mainnet / Testnet / RPC</span>
+        </div>
+        <div class="ports-summary-container" id="portsSummaryContainer">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 4: Filterable Transaction Ledger Table -->
+    <section class="table-section">
+      <div class="table-card">
+        <div class="table-toolbar">
+          <div class="table-title-area">
+            <h3 class="table-title">Transaction Ledger & Forensic Log</h3>
+            <span class="badge-tag" id="tableFilterCount">Showing 50 of 50 Transactions</span>
+          </div>
+
+          <div class="table-filter-controls">
+            <input type="text" id="tableSearchInput" placeholder="Filter by TXID, Address, Country..." class="table-search">
+            <select id="tableTypologySelect" class="custom-select">
+              <option value="ALL">All Typologies</option>
+              <option value="SEED">🔴 Illicit Seed</option>
+              <option value="PEEL">🟠 Peel Chain</option>
+              <option value="CJ">🟣 CoinJoin</option>
+              <option value="MI">🔵 Consolidation</option>
+              <option value="BURST">🟡 Burst Fan-out</option>
+              <option value="HV">🟢 High-Value</option>
+              <option value="STANDARD">⚪ Standard</option>
+            </select>
+            <select id="tableRiskSelect" class="custom-select">
+              <option value="ALL">All Risk Levels</option>
+              <option value="HIGH">High Risk (0.75+)</option>
+              <option value="MEDIUM">Medium Risk</option>
+              <option value="LOW">Low Risk</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="transactionsTable">
+            <thead>
+              <tr>
+                <th>TXID</th>
+                <th>Timestamp (UTC)</th>
+                <th>Inputs (Count / BTC)</th>
+                <th>Outputs (Count / BTC)</th>
+                <th>Total Volume</th>
+                <th>Fee</th>
+                <th>Typology Tag</th>
+                <th>Geo / ASN</th>
+                <th>Risk</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Full Transaction Detail Modal -->
+  <div class="modal-backdrop" id="txModal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span class="modal-badge" id="modalTypologyBadge">Transaction Details</span>
+          <h2 class="modal-title font-mono" id="modalTxid">tx_json_0001</h2>
+        </div>
+        <button class="modal-close-btn" id="btnModalClose">&times;</button>
+      </div>
+
+      <div class="modal-body" id="modalBody">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom File Upload Modal -->
+  <div class="modal-backdrop" id="uploadModal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title">Upload Custom Transaction Dataset</h2>
+        <button class="modal-close-btn" id="btnUploadModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-zone-icon">📁</div>
+          <h3>Drag & Drop Transaction File</h3>
+          <p>Supports <strong>.json</strong>, <strong>.csv</strong>, or <strong>.xml</strong> Bitcoin transaction files</p>
+          <input type="file" id="fileInput" accept=".json,.csv,.xml" style="display: none;">
+          <button class="btn btn-primary" id="btnBrowseFiles">Browse File</button>
+        </div>
+        <div class="upload-note">
+          <p>The parser automatically maps inputs, outputs, network endpoints, timestamps, and calculates forensic typologies.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast-notification" id="toast"></div>
+
+  <!-- Core JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>
