@@ -9,6 +9,7 @@ import re
 
 TXID_PATTERN = re.compile(r"tx_[a-zA-Z0-9_]+")
 ADDRESS_PATTERN = re.compile(r"bc1[a-zA-Z0-9]+")
+IP_PATTERN = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 HOP_PATTERN = re.compile(r"(\d+)\s*hop")
 
 
@@ -19,6 +20,14 @@ def route(text: str) -> tuple[str, dict] | None:
     lower = text.lower()
     txid_match = TXID_PATTERN.search(text)
     address_match = ADDRESS_PATTERN.search(text)
+    ip_match = IP_PATTERN.search(text)
+
+    # Entity profile / investigation intent
+    if any(k in lower for k in ["investigate", "profile", "history of", "who is", "entity profile"]):
+        if address_match:
+            return "get_entity_profile", {"entity_id": address_match.group(), "entity_type": "address"}
+        if ip_match:
+            return "get_entity_profile", {"entity_id": ip_match.group(), "entity_type": "ip"}
 
     if any(k in lower for k in ["why", "explain", "flagged", "reason"]):
         if txid_match:
@@ -41,7 +50,7 @@ def route(text: str) -> tuple[str, dict] | None:
         return "get_subgraph", {"center": center, "hops": hops}
 
     if any(k in lower for k in ["search", "find", "look up", "lookup"]):
-        target = txid_match.group() if txid_match else (address_match.group() if address_match else None)
+        target = txid_match.group() if txid_match else (address_match.group() if address_match else (ip_match.group() if ip_match else None))
         if target is None:
             return None
         return "search_entity", {"query": target}

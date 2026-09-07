@@ -26,6 +26,15 @@ class SearchArgs(BaseModel):
     query: str = Field(description="Address, txid, IP, or entity name to search for")
 
 
+class EntityProfileArgs(BaseModel):
+    """Args for: 'investigate address X' / 'profile IP Y' / 'entity profile'."""
+    entity_id: str = Field(description="Address (bc1q...) or IP value to profile")
+    entity_type: Literal["address", "ip"] = Field(
+        default="address",
+        description="Type of entity: 'address' or 'ip'",
+    )
+
+
 # Registry used by both the fast-path router and the LLM fallback —
 # single source of truth for "what tools exist," matches the doc's
 # guardrail that the assistant may only call pre-approved named tools.
@@ -34,6 +43,7 @@ TOOL_SCHEMAS = {
     "list_patterns": ListPatternsArgs,
     "get_subgraph": SubgraphArgs,
     "search_entity": SearchArgs,
+    "get_entity_profile": EntityProfileArgs,
 }
 
 

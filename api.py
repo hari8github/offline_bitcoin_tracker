@@ -24,6 +24,7 @@ from graph.loader import ensure_constraints, load_batch
 from ingestion.parsers import parse_csv_file, parse_json_file, parse_xml_file
 from ingestion.validate import validate_batch
 from agents.graph import build_agent, run_agent, AgentResponse
+from agents.agent_tools import get_entity_profile
 
 app = FastAPI(
     title="Bitcoin Forensics API",
@@ -229,6 +230,27 @@ def graph_search(q: str, case_id: str = DEFAULT_CASE_ID, limit: int = 20):
                                 "props": _str_props(dict(r["props"])),
                             })
         return {"query": q, "count": len(results), "results": results[:limit]}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/entity/profile", tags=["Graph"])
+def entity_profile(
+    entity_id: str,
+    entity_type: str = "address",
+    case_id: str = DEFAULT_CASE_ID,
+):
+    """
+    Aggregate cross-case history, counterparties, associated IPs,
+    clusters, and alerts for an address or IP.
+    """
+    if entity_type not in ("address", "ip"):
+        raise HTTPException(status_code=400, detail="entity_type must be 'address' or 'ip'")
+    try:
+        with _driver() as driver:
+            return get_entity_profile(driver, case_id=case_id, entity_id=entity_id, entity_type=entity_type)
     except HTTPException:
         raise
     except Exception as exc:

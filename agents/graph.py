@@ -61,6 +61,26 @@ def _format_reply(tool_name: str, result: dict) -> str:
         kinds = [k for k, v in result["matched_as"].items() if v]
         return f"'{result['query']}' matched as: {', '.join(kinds)}."
 
+    if tool_name == "get_entity_profile":
+        if result.get("transaction_count", 0) == 0:
+            return f"No transaction history found for {result.get('entity_type', 'entity')} {result.get('entity_id', '')} in this case."
+        if result.get("entity_type") == "address":
+            rb = result.get("role_breakdown") or {}
+            alerts_str = f", {result.get('alert_count', 0)} alert(s)" if result.get("alert_count") else ", no alerts"
+            return (
+                f"Address {result.get('entity_id')}: {result.get('transaction_count')} tx(s) "
+                f"({rb.get('as_input', 0)} in, {rb.get('as_output', 0)} out), "
+                f"{result.get('counterparty_count', 0)} counterparty(ies){alerts_str}. "
+                f"Active {result.get('first_seen')} to {result.get('last_seen')} ({result.get('known_since_days', 0)} days)."
+            )
+        else:
+            alerts_str = f", {result.get('alert_count', 0)} alert(s)" if result.get("alert_count") else ", no alerts"
+            return (
+                f"IP {result.get('entity_id')}: {result.get('transaction_count')} tx(s) observed, "
+                f"{result.get('address_count', 0)} communicating address(es){alerts_str}. "
+                f"Active {result.get('first_seen')} to {result.get('last_seen')} ({result.get('known_since_days', 0)} days)."
+            )
+
     return "Done."
 
 
