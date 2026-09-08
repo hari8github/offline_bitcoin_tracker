@@ -50,10 +50,10 @@ const API = (() => {
     },
 
     // ── Assistant ──────────────────────────────────────────
-    assistantChat: (message, cid) => _fetch('/assistant/chat', {
+    assistantChat: (message, cid, sessionId) => _fetch('/assistant/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, case_id: cid }),
+      body: JSON.stringify({ message, case_id: cid, session_id: sessionId || '' }),
     }),
   };
 

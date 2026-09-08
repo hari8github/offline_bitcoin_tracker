@@ -243,11 +243,9 @@ const Graph = (() => {
   function centerOn(nodeId, nodeType) {
     Nav.go('investigate');
     setTimeout(async () => {
-      if (!cy || !State.hasGraphNode(nodeId)) {
-        await loadSubgraph(nodeId, nodeType || 'Transaction');
-      }
-      const node = cy.$id(nodeId);
-      if (node.length) {
+      await loadSubgraph(nodeId, nodeType || 'Transaction');
+      const node = cy ? cy.$id(nodeId) : null;
+      if (node && node.length) {
         cy.animate({ center: { eles: node }, zoom: 1.4 }, { duration: 400 });
         node.select();
         _openEvidence(node.data());

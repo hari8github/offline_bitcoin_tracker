@@ -34,6 +34,13 @@ const Chat = (() => {
 
 const Assistant = (() => {
 
+  // Stable session ID for this browser tab — persists across messages,
+  // cleared on page reload. Lets the backend resolve follow-up pronouns
+  // ("explain this more", "show graph") against the last entity discussed.
+  const _sessionId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);  // fallback for old browsers
+
   async function send() {
     const input = document.getElementById('chat-input');
     const text  = input?.value?.trim();
@@ -46,7 +53,7 @@ const Assistant = (() => {
 
     _appendTyping();
     try {
-      const data = await API.assistantChat(text, State.getCase());
+      const data = await API.assistantChat(text, State.getCase(), _sessionId);
       _removeTyping();
       _appendText(data.reply);
       if (data.tool && data.data) {
@@ -86,6 +93,21 @@ const Assistant = (() => {
             ['Nodes',  data.node_count],
           ]);
           _appendOpenGraphBtn(data.center);
+          if (typeof Graph !== 'undefined' && Graph.centerOn) {
+            Graph.centerOn(data.center, data.center.startsWith('bc1') ? 'Address' : 'Transaction');
+          }
+        }
+        break;
+
+      case 'investigate':
+        if (data.id) {
+          if (data.kind === 'transaction' && data.own_alerts?.alerts?.length) {
+            _appendAlertCards(
+              data.own_alerts.alerts.map(a => ({ txid: data.id, type: a.type, confidence: a.confidence, evidence: a.evidence })),
+              'Alert Details'
+            );
+          }
+          _appendOpenGraphBtn(data.id);
         }
         break;
 

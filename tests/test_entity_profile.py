@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from agents.agent_schema import EntityProfileArgs, TOOL_SCHEMAS
 from agents.agent_tools import get_entity_profile, TOOL_FUNCTIONS
+from agents.graph import _format_reply
 from agents.intent_router import route
 
 
@@ -334,31 +335,77 @@ class TestEntityProfile(unittest.TestCase):
         self.assertEqual(profile["alert_count"], 30)
 
     def test_call_signature_flexibility(self):
-        """Ensure get_entity_profile handles different argument orders correctly."""
+        """Ensure get_entity_profile handles standard positional and keyword arguments correctly."""
         def handler(query, params):
             return MockResult(None)
 
         driver = MockDriver(handler)
-        # 1. (driver, case_id, entity_id, entity_type)
+        # 1. Standard positional: (driver, case_id, entity_id, entity_type)
         r1 = get_entity_profile(driver, "CASE_001", "bc1qtest", "address")
         self.assertEqual(r1["entity_id"], "bc1qtest")
         self.assertEqual(r1["case_id"], "CASE_001")
         self.assertEqual(r1["entity_type"], "address")
 
-        # 2. (driver, entity_id, entity_type)
-        r2 = get_entity_profile(driver, "bc1qtest", "address")
-        self.assertEqual(r2["entity_id"], "bc1qtest")
-        self.assertEqual(r2["entity_type"], "address")
+        # 2. Named keyword invocation
+        r2 = get_entity_profile(driver, entity_id="192.0.2.1", entity_type="ip", case_id="CASE_002")
+        self.assertEqual(r2["entity_id"], "192.0.2.1")
+        self.assertEqual(r2["entity_type"], "ip")
+        self.assertEqual(r2["case_id"], "CASE_002")
 
-        # 3. Keyword invocation
-        r3 = get_entity_profile(driver, entity_id="192.0.2.1", entity_type="ip", case_id="CASE_002")
-        self.assertEqual(r3["entity_id"], "192.0.2.1")
-        self.assertEqual(r3["entity_type"], "ip")
-        self.assertEqual(r3["case_id"], "CASE_002")
+        # 3. LangGraph tool execution unpacked kwargs: fn(driver, case_id, **tool_args)
+        args = {"entity_id": "bc1qtest", "entity_type": "address"}
+        r3 = get_entity_profile(driver, "CASE_003", **args)
+        self.assertEqual(r3["entity_id"], "bc1qtest")
+        self.assertEqual(r3["case_id"], "CASE_003")
+        self.assertEqual(r3["entity_type"], "address")
+
+    def test_counterparty_directional_and_cluster_relationships(self):
+        """Verify that counterparty query is strictly directional and cluster query uses CANDIDATE_MEMBER_OF."""
+        executed_queries = []
+
+        def handler(query, params):
+            executed_queries.append(query)
+            if "OPTIONAL MATCH (a)-[s:SPENDS]->(t_in:Transaction)" in query:
+                return MockResult({
+                    "address": "bc1qtest",
+                    "risk_score": None,
+                    "as_input": 1,
+                    "as_output": 1,
+                    "total_sent": 1000,
+                    "total_received": 1000,
+                    "in_tx_list": [{"txid": "tx1", "ts": "2026-03-01T00:00:00Z"}],
+                    "out_tx_list": [{"txid": "tx2", "ts": "2026-03-02T00:00:00Z"}],
+                })
+            if "counterparties" in query:
+                return MockResult({"counterparties": ["bc1qother"]})
+            if "clusters" in query:
+                return MockResult({"clusters": []})
+            if "alerts" in query:
+                return MockResult({"alerts": []})
+            return []
+
+        driver = MockDriver(handler)
+        get_entity_profile(driver, "CASE_001", "bc1qtest", "address")
+
+        # Verify counterparty query has directional constraints
+        cp_queries = [q for q in executed_queries if "counterparties" in q]
+        self.assertTrue(len(cp_queries) > 0)
+        cp_q = cp_queries[0]
+        self.assertIn("[:SPENDS]->(t_out:Transaction)-[:PAYS_TO]->", cp_q)
+        self.assertIn("[:SPENDS]->(t_in:Transaction)-[:PAYS_TO]->(a)", cp_q)
+        self.assertNotIn("-[:SPENDS|PAYS_TO]-(t:Transaction)-[:SPENDS|PAYS_TO]-", cp_q)
+
+        # Verify cluster query uses CANDIDATE_MEMBER_OF
+        cluster_queries = [q for q in executed_queries if "clusters" in q]
+        self.assertTrue(len(cluster_queries) > 0)
+        cl_q = cluster_queries[0]
+        self.assertIn("CANDIDATE_MEMBER_OF", cl_q)
+        self.assertNotIn("BELONGS_TO", cl_q)
+        self.assertNotIn("IN_CLUSTER", cl_q)
 
     def test_intent_router_entity_profile(self):
-        """Verify intent router matches profile and investigate queries."""
-        m1 = route("investigate bc1qcsvPEEL0100")
+        """Verify intent router matches profile and history queries."""
+        m1 = route("profile bc1qcsvPEEL0100")
         self.assertIsNotNone(m1)
         self.assertEqual(m1[0], "get_entity_profile")
         self.assertEqual(m1[1], {"entity_id": "bc1qcsvPEEL0100", "entity_type": "address"})
@@ -372,6 +419,91 @@ class TestEntityProfile(unittest.TestCase):
         self.assertIsNotNone(m3)
         self.assertEqual(m3[0], "get_entity_profile")
         self.assertEqual(m3[1], {"entity_id": "bc1qcsvPEEL0100", "entity_type": "address"})
+
+    def test_format_reply_timeframe(self):
+        """Verify reply phrasing for single occurrence vs multi-day activity."""
+        single_occ = {
+            "entity_id": "bc1qtest",
+            "entity_type": "address",
+            "transaction_count": 1,
+            "role_breakdown": {"as_input": 1, "as_output": 0},
+            "counterparty_count": 1,
+            "first_seen": "2026-03-01T12:00:00Z",
+            "last_seen": "2026-03-01T12:00:00Z",
+            "known_since_days": 0,
+            "alert_count": 0,
+        }
+        reply_single = _format_reply("get_entity_profile", single_occ)
+        self.assertIn("Active on 2026-03-01T12:00:00Z (single occurrence).", reply_single)
+        self.assertNotIn("(0 days)", reply_single)
+
+        multi_day = {
+            "entity_id": "bc1qtest",
+            "entity_type": "address",
+            "transaction_count": 3,
+            "role_breakdown": {"as_input": 2, "as_output": 1},
+            "counterparty_count": 2,
+            "first_seen": "2026-03-01T12:00:00Z",
+            "last_seen": "2026-03-05T12:00:00Z",
+            "known_since_days": 4,
+            "alert_count": 0,
+        }
+        reply_multi = _format_reply("get_entity_profile", multi_day)
+        self.assertIn("Active 2026-03-01T12:00:00Z to 2026-03-05T12:00:00Z (4 days).", reply_multi)
+
+        same_day = {
+            "entity_id": "bc1qtest",
+            "entity_type": "address",
+            "transaction_count": 2,
+            "role_breakdown": {"as_input": 1, "as_output": 1},
+            "counterparty_count": 2,
+            "first_seen": "2026-03-01T12:00:00Z",
+            "last_seen": "2026-03-01T18:00:00Z",
+            "known_since_days": 0,
+            "alert_count": 0,
+        }
+        reply_same_day = _format_reply("get_entity_profile", same_day)
+        self.assertIn("Active 2026-03-01T12:00:00Z to 2026-03-01T18:00:00Z (same day).", reply_same_day)
+        self.assertNotIn("(0 days)", reply_same_day)
+
+    def test_alert_deduplication_by_alert_id(self):
+        """Verify that multiple transaction hops for the same alert_id are deduped into a single alert with linked_txids."""
+        def handler(query, params):
+            if "OPTIONAL MATCH (a)-[s:SPENDS]->(t_in:Transaction)" in query:
+                return MockResult({
+                    "address": "bc1qtest",
+                    "risk_score": None,
+                    "as_input": 1,
+                    "as_output": 1,
+                    "total_sent": 1000,
+                    "total_received": 1000,
+                    "in_tx_list": [{"txid": "tx1", "ts": "2026-03-01T00:00:00Z"}],
+                    "out_tx_list": [{"txid": "tx2", "ts": "2026-03-01T01:00:00Z"}],
+                })
+            if "counterparties" in query:
+                return MockResult({"counterparties": []})
+            if "clusters" in query:
+                return MockResult({"clusters": []})
+            if "alerts" in query:
+                return MockResult({
+                    "alerts": [
+                        {
+                            "alert_id": "alert_peel_001",
+                            "type": "peeling_chain",
+                            "confidence": 0.9,
+                            "txid": "tx1",
+                            "linked_txids": ["tx1", "tx2"],
+                        }
+                    ]
+                })
+            return []
+
+        driver = MockDriver(handler)
+        profile = get_entity_profile(driver, "CASE_001", "bc1qtest", "address")
+        self.assertEqual(profile["alert_count"], 1)
+        self.assertEqual(len(profile["alerts"]), 1)
+        self.assertEqual(profile["alerts"][0]["alert_id"], "alert_peel_001")
+        self.assertEqual(profile["alerts"][0]["linked_txids"], ["tx1", "tx2"])
 
 
 if __name__ == "__main__":

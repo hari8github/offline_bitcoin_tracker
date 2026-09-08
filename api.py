@@ -24,7 +24,8 @@ from graph.loader import ensure_constraints, load_batch
 from ingestion.parsers import parse_csv_file, parse_json_file, parse_xml_file
 from ingestion.validate import validate_batch
 from agents.graph import build_agent, run_agent, AgentResponse
-from agents.agent_tools import get_entity_profile
+from agents.agent_schema import ConversationState
+from agents.agent_tools import get_entity_profile, find_similar_transactions, compare_entities
 
 app = FastAPI(
     title="Bitcoin Forensics API",
@@ -255,6 +256,58 @@ def entity_profile(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/transactions/{txid}/similar", tags=["Graph"])
+def similar_transactions(
+    txid: str,
+    case_id: str = DEFAULT_CASE_ID,
+    max_per_category: int = Query(10, ge=1, le=50),
+):
+    """
+    Find transactions connected by concrete, named, explainable relationships:
+    shared counterparty, shared IP, shared ASN, same cluster, same pattern type,
+    and amount/time proximity.
+    """
+    try:
+        with _driver() as driver:
+            return find_similar_transactions(
+                driver,
+                case_id=case_id,
+                txid=txid,
+                max_per_category=max_per_category,
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/entities/compare", tags=["Graph"])
+def compare_entities_endpoint(
+    entity_a: str,
+    entity_b: str,
+    case_id: str = DEFAULT_CASE_ID,
+):
+    """
+    Structured, explainable diff between two entities (address-vs-address,
+    txid-vs-txid, or mixed). Returns connected: true/false with a named list
+    of connections — every connection field is explicitly named.
+    connected: false is a valid answer, not an error.
+    """
+    try:
+        with _driver() as driver:
+            return compare_entities(
+                driver,
+                case_id=case_id,
+                entity_a=entity_a,
+                entity_b=entity_b,
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 
 
 @app.get("/graph/subgraph", tags=["Graph"])
@@ -620,6 +673,11 @@ def detect_peeling_write(case_id: str = DEFAULT_CASE_ID, min_confidence: float =
 # verify_connectivity each time), but the graph structure is static.
 _compiled_agent = None
 
+# In-memory session store: session_id -> ConversationState
+# Lives for the lifetime of the uvicorn process. Tab refresh generates a new
+# session_id (frontend), so stale context clears naturally on reload.
+_SESSION_STORE: dict[str, ConversationState] = {}
+
 
 class ChatRequest:
     """Simple body model for the chat endpoint."""
@@ -631,23 +689,42 @@ from pydantic import BaseModel as _BM
 class _ChatBody(_BM):
     message: str
     case_id: str = DEFAULT_CASE_ID
+    session_id: str = ""   # empty = anonymous (no memory), same behaviour as before
 
 
 @app.post("/assistant/chat", tags=["Assistant"])
 def assistant_chat(body: _ChatBody):
     """Send a message to the LangGraph agent. Returns the agent's reply,
-    the tool it called (if any), and the raw tool result data."""
+    the tool it called (if any), and the raw tool result data.
+    Pass a stable `session_id` (UUID) per browser tab to enable
+    cross-turn memory (pronoun resolution for follow-ups)."""
     global _compiled_agent
     try:
         driver = _driver()
         if _compiled_agent is None:
             _compiled_agent = build_agent(driver)
-        result = run_agent(driver, body.case_id, body.message, compiled_graph=_compiled_agent)
+
+        # Load session context (empty for anonymous/fresh sessions)
+        sid = body.session_id.strip()
+        session_ctx = _SESSION_STORE.get(sid) if sid else None
+
+        result, updated_ctx = run_agent(
+            driver,
+            body.case_id,
+            body.message,
+            compiled_graph=_compiled_agent,
+            session_context=session_ctx,
+        )
+
+        # Persist updated state back to session store
+        if sid and (getattr(updated_ctx, "last_entity_id", None) or any(updated_ctx.values())):
+            _SESSION_STORE[sid] = updated_ctx
+
         driver.close()
         return {
             "reply": result.reply,
-            "tool": result.tool,
-            "data": result.data,
+            "tool":  result.tool,
+            "data":  result.data,
         }
     except HTTPException:
         raise
