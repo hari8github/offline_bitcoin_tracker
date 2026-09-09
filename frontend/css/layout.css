@@ -226,31 +226,37 @@ html, body {
   top: var(--topbar-h);
   right: 0;
   bottom: 0;
-  /* Must be position:relative so child sections can use position:absolute inset:0 */
   overflow: hidden;
+  /* Flex column: sections fill available height via flex:1 + min-height:0 */
+  display: flex;
+  flex-direction: column;
   transition: right var(--transition-slow);
 }
 .content.chat-open { right: var(--chat-w); }
 
 /* ── Section visibility ─────────────────────────────────────── */
-/* Sections use position:absolute inset:0 so their height is always the
-   pixel-definite bounds of the fixed .content parent, regardless of
-   whether the parent has an explicit CSS `height` value. This makes
-   overflow-y:auto work reliably in all browsers. */
+/* KEY PATTERN:
+   - .content is a flex column with a pixel-definite height (fixed + inset)
+   - .section.active fills it via flex:1
+   - min-height:0 overrides the default min-height:auto so the flex child
+     can be SMALLER than its content, which lets overflow-y:auto activate
+   - Each section manages its own internal scroll */
 .section {
   display: none;
-  position: absolute;
-  inset: 0;          /* top:0 right:0 bottom:0 left:0 */
+  width: 100%;
 }
 .section.active {
   display: flex;
   flex-direction: column;
+  flex: 1;        /* fill .content height */
+  min-height: 0;  /* CRITICAL: allows overflow-y:auto to fire */
 }
 
 /* ── Dashboard section ──────────────────────────────────────── */
 #section-dashboard {
   overflow-y: auto;
   background: var(--surface-alt);
+  /* flex:1 + min-height:0 come from .section.active */
 }
 
 .dash-hero {
@@ -358,8 +364,8 @@ html, body {
 }
 
 /* ── Alerts section ─────────────────────────────────────────── */
-/* With position:absolute inset:0 the section has a pixel-definite height,
-   so overflow-y:auto correctly creates a scrollbar when content is taller. */
+/* flex:1 + min-height:0 come from .section.active.
+   overflow-y:auto creates a scroll container bounded by .content's height. */
 #section-alerts {
   overflow-y: auto;
   overflow-x: hidden;
@@ -367,13 +373,10 @@ html, body {
   gap: 14px;
   background: var(--surface-alt);
 }
+/* All direct children stay at natural height (no shrinking into the section) */
 #section-alerts > * {
   flex-shrink: 0;
   min-width: 0;
-}
-/* Allow the alerts table card to expand to natural height */
-#section-alerts .alerts-table-card {
-  overflow: hidden; /* keep border-radius clip but card grows naturally */
 }
 
 /* ── Chat drawer (persistent, all sections) ─────────────────── */
