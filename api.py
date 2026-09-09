@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -181,6 +182,322 @@ def geo_distribution(case_id: str = DEFAULT_CASE_ID):
                 geo = [{"country": r["country"] or "Unknown", "count": r["count"]} for r in s.run(geo_q, c=case_id)]
                 asn = [{"asn": r["asn"], "count": r["count"]} for r in s.run(asn_q, c=case_id)]
         return {"geo": geo, "asn": asn}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/dashboard/risk-exposure", tags=["Dashboard"])
+def dashboard_risk_exposure(case_id: str = DEFAULT_CASE_ID):
+    """
+    Risk Exposure Panel:
+    For every Address with risk_score set (from seed labels), compute direct BTC in/out
+    and count distinct addresses reachable within 1, 2, and 3 hops (via SPENDS/PAYS_TO)
+    traversing only transactions within the specified case_id.
+    """
+    # Scaling note: Live graph traversal is instantaneous for offline/investigation scale (~164 tx).
+    # For large graph scales (>100k tx), this can be pre-computed at alert/ingest write-time into a summary projection.
+    q = """
+    MATCH (seed:Address)-[:SPENDS|PAYS_TO]-(t_case:Transaction {case_id: $c})
+    WHERE seed.risk_score IS NOT NULL
+    WITH DISTINCT seed
+    OPTIONAL MATCH (seed)<-[r_in:PAYS_TO]-(t_in:Transaction {case_id: $c})
+    WITH seed, coalesce(sum(r_in.amount_sats), 0) AS direct_in_sats
+    OPTIONAL MATCH (seed)-[r_out:SPENDS]->(t_out:Transaction {case_id: $c})
+    WITH seed, direct_in_sats, coalesce(sum(r_out.amount_sats), 0) AS direct_out_sats
+
+    OPTIONAL MATCH path = (seed)-[:SPENDS|PAYS_TO*1..6]-(other:Address)
+    WHERE other <> seed
+      AND all(n IN nodes(path) WHERE (NOT n:Transaction) OR n.case_id = $c)
+    WITH seed, direct_in_sats, direct_out_sats, other, min(length(path)) AS rel_len
+    WITH seed, direct_in_sats, direct_out_sats,
+         count(DISTINCT CASE WHEN rel_len <= 2 THEN other END) AS hop1_addrs,
+         count(DISTINCT CASE WHEN rel_len <= 4 THEN other END) AS hop2_addrs,
+         count(DISTINCT CASE WHEN rel_len <= 6 THEN other END) AS hop3_addrs
+
+    RETURN seed.value AS address,
+           coalesce(seed.entity_name, 'Known Seed') AS entity_name,
+           seed.risk_score AS risk_score,
+           direct_in_sats,
+           direct_out_sats,
+           hop1_addrs,
+           hop2_addrs,
+           hop3_addrs
+    ORDER BY seed.risk_score DESC, (direct_in_sats + direct_out_sats) DESC
+    """
+    try:
+        with _driver() as driver:
+            with driver.session() as s:
+                rows = []
+                for r in s.run(q, c=case_id):
+                    in_sats = r["direct_in_sats"] or 0
+                    out_sats = r["direct_out_sats"] or 0
+                    rows.append({
+                        "address": r["address"],
+                        "entity_name": r["entity_name"],
+                        "risk_score": r["risk_score"],
+                        "direct_in_sats": in_sats,
+                        "direct_out_sats": out_sats,
+                        "direct_in_btc": _sats_to_btc(in_sats),
+                        "direct_out_btc": _sats_to_btc(out_sats),
+                        "total_direct_btc": _sats_to_btc(in_sats + out_sats),
+                        "hop1_addrs": r["hop1_addrs"] or 0,
+                        "hop2_addrs": r["hop2_addrs"] or 0,
+                        "hop3_addrs": r["hop3_addrs"] or 0,
+                    })
+        return {"case_id": case_id, "seeds": rows}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/dashboard/structural-flags", tags=["Dashboard"])
+def dashboard_structural_flags(case_id: str = DEFAULT_CASE_ID):
+    """
+    Structural Flags / Anomalies Panel:
+    - Burst Senders: Addresses appearing as input (SPENDS) across >= 4 transactions within a 1-hour window.
+    - Address Reuse Across Roles: Addresses that act as both PAYS_TO destination and subsequently SPENDS source.
+    """
+    q_burst = """
+    MATCH (a:Address)-[:SPENDS]->(t:Transaction {case_id: $c})
+    WITH a, t
+    ORDER BY t.timestamp ASC
+    WITH a, collect({txid: t.txid, timestamp: toString(t.timestamp), amount_sats: t.total_input_sats}) AS spends
+    WHERE size(spends) >= 4
+    RETURN a.value AS address, coalesce(a.entity_name, '') AS entity_name, spends
+    """
+    q_reuse = """
+    MATCH (t1:Transaction {case_id: $c})-[r1:PAYS_TO]->(a:Address)-[r2:SPENDS]->(t2:Transaction {case_id: $c})
+    WHERE t1.timestamp <= t2.timestamp
+    WITH a, count(DISTINCT t1) AS received_tx_count, count(DISTINCT t2) AS spent_tx_count,
+         sum(r1.amount_sats) AS received_sats, sum(r2.amount_sats) AS spent_sats
+    RETURN count(a) AS total_reused_addresses,
+           collect({
+               address: a.value,
+               entity_name: coalesce(a.entity_name, ''),
+               received_tx_count: received_tx_count,
+               spent_tx_count: spent_tx_count,
+               received_sats: received_sats,
+               spent_sats: spent_sats
+           })[..10] AS sample_reused
+    """
+    try:
+        with _driver() as driver:
+            with driver.session() as s:
+                burst_senders = []
+                for r in s.run(q_burst, c=case_id):
+                    addr = r["address"]
+                    entity = r["entity_name"]
+                    spends = r["spends"]
+                    parsed = []
+                    for sp in spends:
+                        ts_str = sp.get("timestamp") or ""
+                        try:
+                            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                            parsed.append((ts, sp))
+                        except Exception:
+                            continue
+
+                    max_window_count = 0
+                    window_spends = []
+                    for i in range(len(parsed)):
+                        cur_window = [parsed[i]]
+                        for j in range(i + 1, len(parsed)):
+                            if (parsed[j][0] - parsed[i][0]).total_seconds() <= 3600:
+                                cur_window.append(parsed[j])
+                            else:
+                                break
+                        if len(cur_window) > max_window_count:
+                            max_window_count = len(cur_window)
+                            window_spends = cur_window
+
+                    if max_window_count >= 4:
+                        burst_senders.append({
+                            "address": addr,
+                            "entity_name": entity,
+                            "burst_count": max_window_count,
+                            "total_spends": len(spends),
+                            "window_start": window_spends[0][0].isoformat() if window_spends else "",
+                            "window_end": window_spends[-1][0].isoformat() if window_spends else "",
+                            "sample_txids": [w[1]["txid"] for w in window_spends[:5]],
+                        })
+
+                burst_senders.sort(key=lambda b: b["burst_count"], reverse=True)
+
+                reuse_res = s.run(q_reuse, c=case_id).single()
+                total_reused = reuse_res["total_reused_addresses"] if reuse_res else 0
+                sample_reused = []
+                if reuse_res and reuse_res["sample_reused"]:
+                    for item in reuse_res["sample_reused"]:
+                        sample_reused.append({
+                            "address": item["address"],
+                            "entity_name": item["entity_name"],
+                            "received_tx_count": item["received_tx_count"],
+                            "spent_tx_count": item["spent_tx_count"],
+                            "received_btc": _sats_to_btc(item["received_sats"]),
+                            "spent_btc": _sats_to_btc(item["spent_sats"]),
+                        })
+
+        return {
+            "case_id": case_id,
+            "burst_senders": burst_senders,
+            "address_reuse": {
+                "total_reused_addresses": total_reused,
+                "sample_reused": sample_reused,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/dashboard/case-highlights", tags=["Dashboard"])
+def dashboard_case_highlights(case_id: str = DEFAULT_CASE_ID):
+    """
+    Case Highlights Panel:
+    Identifies the single longest peeling chain and the largest CoinJoin transaction in the case.
+    """
+    try:
+        with _driver() as driver:
+            cjs = detect_coinjoin(driver, case_id=case_id, min_confidence=0.5)
+            peels = detect_peeling_chain(driver, case_id=case_id, min_confidence=0.5)
+
+        longest_peel = None
+        if peels:
+            peels_sorted = sorted(peels, key=lambda p: len(p.get("path") or []), reverse=True)
+            top_peel = peels_sorted[0]
+            path = top_peel.get("path") or []
+            vals = top_peel.get("evidence", {}).get("value_sequence_sats") or []
+            peeled_off_sats = (vals[0] - vals[-1]) if len(vals) >= 2 else 0
+            longest_peel = {
+                "alert_id": top_peel.get("alert_id", ""),
+                "txid": top_peel.get("txid", ""),
+                "confidence": top_peel.get("confidence", 0.0),
+                "chain_length": len(path),
+                "path": path,
+                "start_txid": path[0] if path else "",
+                "end_txid": path[-1] if path else "",
+                "peeled_off_sats": peeled_off_sats,
+                "peeled_off_btc": _sats_to_btc(peeled_off_sats),
+                "start_balance_btc": _sats_to_btc(vals[0]) if vals else 0.0,
+                "end_balance_btc": _sats_to_btc(vals[-1]) if vals else 0.0,
+            }
+
+        largest_cj = None
+        if cjs:
+            cjs_sorted = sorted(cjs, key=lambda c: c.get("evidence", {}).get("input_count", 0), reverse=True)
+            top_cj = cjs_sorted[0]
+            ev = top_cj.get("evidence", {})
+            amounts = ev.get("output_amounts_sats") or []
+            largest_cj = {
+                "alert_id": top_cj.get("alert_id", ""),
+                "txid": top_cj.get("txid", ""),
+                "confidence": top_cj.get("confidence", 0.0),
+                "input_count": ev.get("input_count", 0),
+                "output_count": ev.get("output_count", 0),
+                "equal_output_count": len(amounts),
+                "denomination_btc": _sats_to_btc(amounts[0]) if amounts else 0.0,
+                "total_btc": _sats_to_btc(sum(amounts)) if amounts else 0.0,
+            }
+
+        return {
+            "case_id": case_id,
+            "longest_peeling_chain": longest_peel,
+            "largest_coinjoin": largest_cj,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/dashboard/fee-outliers", tags=["Dashboard"])
+def dashboard_fee_outliers(case_id: str = DEFAULT_CASE_ID):
+    """
+    Fee Outliers Panel:
+    Computes mean and standard deviation of transaction fees (sats).
+    Identifies high-priority fee spikes (> 2 standard deviations above mean)
+    and zero-fee transactions (batching / service wallets).
+    """
+    q = """
+    MATCH (t:Transaction {case_id: $c})
+    WHERE t.implied_fee_sats IS NOT NULL
+    RETURN t.txid AS txid,
+           t.implied_fee_sats AS fee_sats,
+           t.total_input_sats AS input_sats,
+           t.total_output_sats AS output_sats,
+           toString(t.timestamp) AS timestamp
+    ORDER BY fee_sats DESC
+    """
+    try:
+        with _driver() as driver:
+            with driver.session() as s:
+                rows = [dict(r) for r in s.run(q, c=case_id)]
+
+        if not rows:
+            return {
+                "case_id": case_id,
+                "total_tx_with_fees": 0,
+                "mean_fee_sats": 0.0,
+                "mean_fee_btc": 0.0,
+                "stddev_fee_sats": 0.0,
+                "stddev_fee_btc": 0.0,
+                "high_threshold_sats": 0.0,
+                "high_threshold_btc": 0.0,
+                "high_outliers": [],
+                "zero_fee_transactions": [],
+            }
+
+        fees = [r["fee_sats"] for r in rows]
+        n = len(fees)
+        mean = sum(fees) / n
+        variance = sum((x - mean) ** 2 for x in fees) / n
+        stddev = variance ** 0.5
+        threshold = mean + 2 * stddev
+
+        high_outliers = [
+            {
+                "txid": r["txid"],
+                "fee_sats": r["fee_sats"],
+                "fee_btc": _sats_to_btc(r["fee_sats"]),
+                "input_btc": _sats_to_btc(r["input_sats"]),
+                "output_btc": _sats_to_btc(r["output_sats"]),
+                "timestamp": r["timestamp"],
+                "fee_rate_pct": round((r["fee_sats"] / r["input_sats"] * 100), 2) if r["input_sats"] else 0.0,
+                "sigma_score": round((r["fee_sats"] - mean) / stddev, 2) if stddev > 0 else 0.0,
+                "type": "high_fee",
+            }
+            for r in rows if r["fee_sats"] > threshold
+        ]
+
+        zero_fees = [
+            {
+                "txid": r["txid"],
+                "fee_sats": 0,
+                "fee_btc": 0.0,
+                "input_btc": _sats_to_btc(r["input_sats"]),
+                "output_btc": _sats_to_btc(r["output_sats"]),
+                "timestamp": r["timestamp"],
+                "type": "zero_fee",
+            }
+            for r in rows if r["fee_sats"] == 0
+        ]
+
+        return {
+            "case_id": case_id,
+            "total_tx_with_fees": n,
+            "mean_fee_sats": round(mean, 2),
+            "mean_fee_btc": _sats_to_btc(mean),
+            "stddev_fee_sats": round(stddev, 2),
+            "stddev_fee_btc": _sats_to_btc(stddev),
+            "high_threshold_sats": round(threshold, 2),
+            "high_threshold_btc": _sats_to_btc(threshold),
+            "high_outliers": high_outliers,
+            "zero_fee_transactions": zero_fees,
+        }
     except HTTPException:
         raise
     except Exception as exc:
@@ -441,16 +758,26 @@ def graph_subgraph(
 
 @app.get("/alerts", tags=["Alerts"])
 def list_alerts(case_id: str = DEFAULT_CASE_ID, type_filter: Optional[str] = None):
-    """Return all persisted Alert nodes for a case, sorted by confidence desc."""
+    """Return all persisted Alert nodes for a case, deduplicated, with flagged_txids and risk_hits."""
     base = """
     MATCH (al:Alert)-[:FLAGS]->(t:Transaction)
     WHERE al.case_id = $c
     """
     filt = "AND al.type = $tf " if type_filter else ""
     q = base + filt + """
+    WITH al, collect(DISTINCT t.txid) AS flagged_txids
+    OPTIONAL MATCH (al)-[:FLAGS]->(t:Transaction)-[:SPENDS|PAYS_TO]-(a:Address)
+    WHERE a.risk_score IS NOT NULL
+    WITH al, flagged_txids,
+         collect(DISTINCT CASE WHEN a IS NOT NULL THEN {
+             entity: coalesce(a.entity_name, 'Known Seed'),
+             risk: a.risk_score,
+             address: a.value
+         } END) AS raw_risk_hits
     RETURN al.alert_id AS alert_id, al.type AS type,
            al.confidence AS confidence, al.txid AS txid,
-           al.evidence_json AS ev_json,
+           flagged_txids, al.evidence_json AS ev_json,
+           raw_risk_hits,
            toString(al.updated_at) AS updated_at
     ORDER BY al.confidence DESC
     """
@@ -468,13 +795,34 @@ def list_alerts(case_id: str = DEFAULT_CASE_ID, type_filter: Optional[str] = Non
                             ev = json.loads(r["ev_json"])
                         except Exception:
                             pass
+
+                    # Clean risk_hits list
+                    raw_hits = r["raw_risk_hits"] or []
+                    risk_hits = [h for h in raw_hits if h and h.get("risk") is not None]
+
+                    # Compute total transaction value / exposure from evidence
+                    total_sats = 0
+                    if r["type"] == "coinjoin_like":
+                        outs = ev.get("output_amounts_sats") or []
+                        total_sats = sum(outs)
+                    elif r["type"] == "peeling_chain":
+                        seq = ev.get("value_sequence_sats") or []
+                        total_sats = seq[0] if seq else 0
+
+                    flagged_txids = r["flagged_txids"] or []
+                    primary_txid = r["txid"] or (flagged_txids[0] if flagged_txids else None)
+
                     alerts.append({
                         "alert_id": r["alert_id"],
                         "type": r["type"],
                         "confidence": r["confidence"],
                         "confidence_pct": f"{(r['confidence'] or 0) * 100:.1f}%",
-                        "txid": r["txid"],
+                        "txid": primary_txid,
+                        "flagged_txids": flagged_txids,
                         "evidence": ev,
+                        "risk_hits": risk_hits,
+                        "total_sats": total_sats,
+                        "total_btc": _sats_to_btc(total_sats),
                         "updated_at": r["updated_at"],
                     })
         return {"case_id": case_id, "alert_count": len(alerts), "alerts": alerts}

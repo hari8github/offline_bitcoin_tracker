@@ -226,23 +226,30 @@ html, body {
   top: var(--topbar-h);
   right: 0;
   bottom: 0;
+  /* Must be position:relative so child sections can use position:absolute inset:0 */
   overflow: hidden;
   transition: right var(--transition-slow);
 }
 .content.chat-open { right: var(--chat-w); }
 
 /* ── Section visibility ─────────────────────────────────────── */
+/* Sections use position:absolute inset:0 so their height is always the
+   pixel-definite bounds of the fixed .content parent, regardless of
+   whether the parent has an explicit CSS `height` value. This makes
+   overflow-y:auto work reliably in all browsers. */
 .section {
   display: none;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;          /* top:0 right:0 bottom:0 left:0 */
 }
-.section.active { display: flex; flex-direction: column; }
+.section.active {
+  display: flex;
+  flex-direction: column;
+}
 
 /* ── Dashboard section ──────────────────────────────────────── */
 #section-dashboard {
   overflow-y: auto;
-  flex-direction: column;
   background: var(--surface-alt);
 }
 
@@ -290,7 +297,7 @@ html, body {
 /* ── Investigate section ────────────────────────────────────── */
 #section-investigate {
   flex-direction: row;
-  overflow: hidden;
+  overflow: hidden; /* graph canvas handles its own scroll */
 }
 
 .graph-col {
@@ -351,12 +358,22 @@ html, body {
 }
 
 /* ── Alerts section ─────────────────────────────────────────── */
+/* With position:absolute inset:0 the section has a pixel-definite height,
+   so overflow-y:auto correctly creates a scrollbar when content is taller. */
 #section-alerts {
   overflow-y: auto;
-  padding: 20px 24px;
-  flex-direction: column;
+  overflow-x: hidden;
+  padding: 20px 24px 40px;
   gap: 14px;
   background: var(--surface-alt);
+}
+#section-alerts > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+/* Allow the alerts table card to expand to natural height */
+#section-alerts .alerts-table-card {
+  overflow: hidden; /* keep border-radius clip but card grows naturally */
 }
 
 /* ── Chat drawer (persistent, all sections) ─────────────────── */

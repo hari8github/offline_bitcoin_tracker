@@ -98,23 +98,68 @@
         </div>
       </div>
 
-      <!-- Charts 2×2 -->
+      <!-- Forensic Signal Grid -->
       <div class="chart-grid">
+        <!-- Panel 1: Transaction Volume Timeline -->
         <div class="chart-panel">
-          <div class="chart-panel-title">Transaction Volume</div>
+          <div class="chart-panel-title">Transaction Volume Timeline</div>
           <canvas id="chart-timeline" height="160"></canvas>
         </div>
-        <div class="chart-panel">
-          <div class="chart-panel-title">Alert Confidence Distribution</div>
-          <canvas id="chart-conf" height="160"></canvas>
+
+        <!-- Panel 2: Case Highlights -->
+        <div class="forensic-panel" id="dash-case-highlights">
+          <div class="forensic-panel-header">
+            <div>
+              <div class="forensic-panel-title">Case Highlights</div>
+              <div class="forensic-panel-sub">Key forensic anomalies detected in case</div>
+            </div>
+            <span class="pill pill-blue">High Value</span>
+          </div>
+          <div id="dash-case-highlights-content" style="display:flex;flex-direction:column;gap:10px;flex:1">
+            <div class="empty-state-dash">Loading highlights…</div>
+          </div>
         </div>
-        <div class="chart-panel">
-          <div class="chart-panel-title">Top Addresses by Received Value</div>
-          <canvas id="chart-addrs" height="160"></canvas>
+
+        <!-- Panel 3: Risk Exposure -->
+        <div class="forensic-panel" id="dash-risk-exposure">
+          <div class="forensic-panel-header">
+            <div>
+              <div class="forensic-panel-title">Risk Exposure &amp; Hop Reach</div>
+              <div class="forensic-panel-sub">Illicit seed address proximity in case</div>
+            </div>
+            <span class="pill pill-invalid">Seed Taint</span>
+          </div>
+          <div id="dash-risk-exposure-content" style="overflow-x:auto;flex:1">
+            <div class="empty-state-dash">Loading risk exposure…</div>
+          </div>
         </div>
-        <div class="chart-panel">
-          <div class="chart-panel-title">Geo / Country Distribution</div>
-          <canvas id="chart-geo" height="160"></canvas>
+
+        <!-- Panel 4: Structural Anomalies -->
+        <div class="forensic-panel" id="dash-structural-flags">
+          <div class="forensic-panel-header">
+            <div>
+              <div class="forensic-panel-title">Structural Anomalies</div>
+              <div class="forensic-panel-sub">High-frequency bursts &amp; pass-through role reuse</div>
+            </div>
+            <span class="pill pill-duplicate">Graph Patterns</span>
+          </div>
+          <div id="dash-structural-flags-content" style="overflow-x:auto;flex:1">
+            <div class="empty-state-dash">Loading structural flags…</div>
+          </div>
+        </div>
+
+        <!-- Panel 5: Fee Outliers (full span) -->
+        <div class="forensic-panel dash-col-full" id="dash-fee-outliers">
+          <div class="forensic-panel-header">
+            <div>
+              <div class="forensic-panel-title">Fee Outliers &amp; Priority Spikes</div>
+              <div class="forensic-panel-sub">Transactions exceeding +2σ mean fee and zero-fee batch transfers</div>
+            </div>
+            <div id="dash-fee-stats" class="flex-row gap-8"></div>
+          </div>
+          <div id="dash-fee-outliers-content">
+            <div class="empty-state-dash">Loading fee analysis…</div>
+          </div>
         </div>
       </div>
 
@@ -207,11 +252,17 @@
 
     <!-- Status bar (replaces run-detector buttons) -->
     <div class="status-bar" id="alerts-status-bar">
-      <span>Last scan: <strong id="status-last-scan">never</strong></span>
+      <span>Total: <strong id="status-total-alerts">0</strong> alerts</span>
       <span class="status-bar-dot">·</span>
-      <span><strong id="status-coinjoin-count">0</strong> CoinJoin</span>
+      <span><strong id="status-risk-count" style="color:var(--risk-high)">0</strong> risk-adjacent</span>
       <span class="status-bar-dot">·</span>
-      <span><strong id="status-peeling-count">0</strong> Peeling-chain</span>
+      <span>Exposure: <strong id="status-total-btc">0.0000</strong> BTC</span>
+      <!-- Legacy compatibility elements for cached assets -->
+      <span style="display:none" aria-hidden="true">
+        <span id="status-coinjoin-count">0</span>
+        <span id="status-peeling-count">0</span>
+        <span id="status-last-scan">never</span>
+      </span>
       <span class="status-bar-spacer"></span>
       <button class="btn-rescan" id="rescan-btn" onclick="Alerts.rescan()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
@@ -225,28 +276,30 @@
         <span id="alerts-count" style="font-size:12px;color:var(--text-muted);font-weight:500"></span>
       </div>
       <div class="filter-chips">
-        <button class="chip alert-chip active" data-type="all"       onclick="Alerts.setFilter('all')">All</button>
+        <button class="chip alert-chip active" data-type="all"           onclick="Alerts.setFilter('all')">All</button>
         <button class="chip alert-chip"        data-type="coinjoin_like" onclick="Alerts.setFilter('coinjoin_like')">CoinJoin</button>
         <button class="chip alert-chip"        data-type="peeling_chain" onclick="Alerts.setFilter('peeling_chain')">Peeling-chain</button>
+        <button class="chip alert-chip"        data-type="risk"          onclick="Alerts.setFilter('risk')">⚠ Touches known risk</button>
       </div>
     </div>
 
     <!-- Alert table -->
-    <div class="panel-card">
-      <div class="table-wrap">
+    <div class="panel-card alerts-table-card">
+      <div class="table-wrap" style="overflow-y:auto">
         <table class="data-table" id="alerts-table">
           <thead>
             <tr>
               <th data-sort="txid"       onclick="Alerts.setSort('txid')">TXID</th>
               <th data-sort="type"       onclick="Alerts.setSort('type')">Type</th>
               <th data-sort="confidence" onclick="Alerts.setSort('confidence')">Confidence</th>
-              <th>Evidence</th>
+              <th data-sort="total_btc"  onclick="Alerts.setSort('total_btc')">Total BTC</th>
+              <th>Evidence &amp; Forensic Signals</th>
               <th data-sort="updated_at" onclick="Alerts.setSort('updated_at')">Detected</th>
-              <th></th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody id="alerts-tbody">
-            <tr><td colspan="6" class="empty-state">No alerts yet — click Re-scan above</td></tr>
+            <tr><td colspan="7" class="empty-state">No alerts yet — click Re-scan above</td></tr>
           </tbody>
         </table>
       </div>
@@ -330,12 +383,12 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <!-- ── App modules ────────────────────────────────────────── -->
-<script src="js/state.js"></script>
-<script src="js/api.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/graph.js"></script>
-<script src="js/alerts.js"></script>
-<script src="js/assistant.js"></script>
+<script src="js/state.js?v=2.1"></script>
+<script src="js/api.js?v=2.1"></script>
+<script src="js/dashboard.js?v=2.1"></script>
+<script src="js/graph.js?v=2.1"></script>
+<script src="js/alerts.js?v=2.1"></script>
+<script src="js/assistant.js?v=2.1"></script>
 
 <!-- ── Bootstrap & Nav ───────────────────────────────────── -->
 <script>

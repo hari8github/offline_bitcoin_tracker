@@ -20,10 +20,14 @@ const API = (() => {
     cases:       ()       => _fetch('/cases'),
 
     // ── Dashboard ──────────────────────────────────────────
-    stats:       (cid)    => _fetch(`/stats?case_id=${enc(cid)}`),
-    timeline:    (cid)    => _fetch(`/dashboard/timeline?case_id=${enc(cid)}`),
-    topAddrs:    (cid, n) => _fetch(`/dashboard/top-addresses?case_id=${enc(cid)}&limit=${n||10}`),
-    geo:         (cid)    => _fetch(`/dashboard/geo?case_id=${enc(cid)}`),
+    stats:           (cid)    => _fetch(`/stats?case_id=${enc(cid)}`),
+    timeline:        (cid)    => _fetch(`/dashboard/timeline?case_id=${enc(cid)}`),
+    topAddrs:        (cid, n) => _fetch(`/dashboard/top-addresses?case_id=${enc(cid)}&limit=${n||10}`),
+    geo:             (cid)    => _fetch(`/dashboard/geo?case_id=${enc(cid)}`),
+    riskExposure:    (cid)    => _fetch(`/dashboard/risk-exposure?case_id=${enc(cid)}`),
+    structuralFlags: (cid)    => _fetch(`/dashboard/structural-flags?case_id=${enc(cid)}`),
+    caseHighlights:  (cid)    => _fetch(`/dashboard/case-highlights?case_id=${enc(cid)}`),
+    feeOutliers:     (cid)    => _fetch(`/dashboard/fee-outliers?case_id=${enc(cid)}`),
 
     // ── Graph ──────────────────────────────────────────────
     search:  (q, cid)     => _fetch(`/graph/search?q=${enc(q)}&case_id=${enc(cid)}`),

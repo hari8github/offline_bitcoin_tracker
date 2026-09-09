@@ -671,3 +671,198 @@
 }
 .filter-input:focus { border-color: var(--accent-blue); }
 .filter-input::placeholder { color: var(--text-muted); }
+
+/* ── Forensic Dashboard Panels ──────────────────────────────── */
+.forensic-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-card);
+  min-height: 220px;
+}
+.forensic-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.forensic-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -.1px;
+}
+.forensic-panel-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.dash-col-full {
+  grid-column: 1 / -1;
+}
+.forensic-subcard {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color var(--transition);
+}
+.forensic-subcard:hover {
+  border-color: var(--border-strong);
+}
+.metric-stat-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.hop-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(59, 125, 255, 0.08);
+  border: 1px solid rgba(59, 125, 255, 0.25);
+  color: var(--accent-blue);
+}
+.hop-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.sigma-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--risk-high-bg);
+  border: 1px solid var(--risk-high);
+  color: var(--risk-high);
+}
+.zero-fee-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+}
+.empty-state-dash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ── Alerts Redesign: Structured Evidence & Clustering ──────── */
+.evidence-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+}
+.evidence-field {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.evidence-key {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  min-width: 75px;
+}
+.evidence-val {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.badge-risk-hit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--risk-high-bg);
+  border: 1px solid var(--risk-high);
+  color: var(--risk-high);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  width: fit-content;
+}
+.pill-hops {
+  display: inline-block;
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(59, 125, 255, 0.3);
+  color: var(--accent-blue);
+  margin-left: 4px;
+}
+.cluster-header-row {
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition);
+}
+.cluster-header-row:hover {
+  background: var(--surface-hover);
+}
+.cluster-header-cell {
+  padding: 8px 12px !important;
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--text-primary);
+}
+.cluster-toggle-icon {
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  margin-right: 6px;
+  color: var(--text-muted);
+  transition: transform .18s ease;
+}
+.cluster-header-row.expanded .cluster-toggle-icon {
+  transform: rotate(90deg);
+}
+.cluster-child-row td:first-child {
+  padding-left: 24px;
+  position: relative;
+}
+.cluster-child-row td:first-child::before {
+  content: "↳";
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+}

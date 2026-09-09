@@ -161,6 +161,7 @@ UNWIND $txids AS txid
 MATCH (t:Transaction {txid: txid, case_id: $case_id})
 MERGE (al:Alert {alert_id: $alert_id})
 SET al.type = $type,
+    al.txid = $txid,
     al.case_id = $case_id,
     al.confidence = $confidence,
     al.evidence_json = $evidence_json,
@@ -202,6 +203,7 @@ def write_alerts(driver, alerts: list[dict], case_id: str | None = None) -> None
                 _WRITE_ALERT_QUERY,
                 alert_id=a["alert_id"],
                 type=a["type"],
+                txid=a["txid"],
                 case_id=a["case_id"],
                 confidence=a["confidence"],
                 evidence_json=json.dumps(a["evidence"]),
